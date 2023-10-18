@@ -1,6 +1,30 @@
 import random 
 import copy
+import chess  
+import chess.svg
 
+
+def dibujarTablero(tablero, n):
+    tableroAjedrez = chess.Board()
+    tableroAjedrez.clear()
+    for i in range(n):
+        for j in range(n):
+            if tablero[i][j]:
+                tableroAjedrez.set_piece_at(chess.square(i, j), chess.Piece(5, chess.WHITE))
+    return tableroAjedrez.fen()
+
+def guardarTablero(dibujo, nombre):
+    tablero = chess.Board(dibujo)
+    tablerosvg = chess.svg.board(board=tablero)
+    archivo = open(nombre, "w")
+    archivo.write(tablerosvg)
+    archivo.close()
+    print("guardado...")
+    
+def guardar(tablero, nombre,  n):
+    dibujo = dibujarTablero(tablero, n)
+    guardarTablero(dibujo, nombre)
+    
 def crearTablero(n):
     tablero = []
     for _ in range(n):
@@ -131,65 +155,72 @@ def encontrarDisponibles(tablero, n, r):
     return disponibles
         
     
-def hillClimbing(tablero, n, H, p):
-    h = 0
+def hillClimbing(tablero, n, H, p, max):
+    heuristica = 0
     mapa = {}
+    reinas = encontrarReinas(tablero, n)
+    mapa, heuristica = calcHeuristica(tablero, reinas, n)
+    puntos = []
+    x_iteraciones = 0
+    y_heuristica = 0
     while True:
-        reinas = encontrarReinas(tablero, n)
-        mapa, h = calcHeuristica(tablero, reinas, n)
-        
-        if h <= H:
+        if not x_iteraciones <= max:
+            print('se alcanzo el maximo...')
             break
-        
-        r = seleccionarReina(reinas, mapa)
-        disponibles = encontrarDisponibles(tablero, n, r)
-        
-        tableroTemporal = mover(tablero, disponibles, r[0], r[1])
+        if heuristica <= H:
+            break
+
+        reina = seleccionarReina(reinas, mapa)
+        disponibles = encontrarDisponibles(tablero, n, reina)
+        tableroTemporal = mover(tablero, disponibles, reina[0], reina[1])
         reinasTemporal = encontrarReinas(tableroTemporal, n)
-        _, hTemporal = calcHeuristica(tableroTemporal, reinasTemporal, n)
-        if hTemporal < h:
+        mapaTemporal, hTemporal = calcHeuristica(tableroTemporal, reinasTemporal, n)
+        
+        if hTemporal < heuristica:
             tablero = tableroTemporal
+            heuristica = hTemporal
+            reinas = reinasTemporal
+            mapa = mapaTemporal
         else:
             pRandom = random.random()
             if pRandom <= p:
                 tablero = tableroTemporal
-    return tablero
+                heuristica = hTemporal
+                reinas = reinasTemporal
+                mapa = mapaTemporal
+        x_iteraciones += 1
+        y_heuristica = heuristica
+        puntos.append((x_iteraciones, y_heuristica))
+    return tablero, puntos
 
-import chess  
-import chess.svg
-import cairosvg   
+  
 
-def dibujarTablero(tablero, n):
-    tableroAjedrez = chess.Board()
-    tableroAjedrez.clear()
+import matplotlib.pyplot as plt
+def graficar(puntos):
+    n= len(puntos)
+    x = []
+    y = []
     for i in range(n):
-        for j in range(n):
-            if tablero[i][j]:
-                tableroAjedrez.set_piece_at(chess.square(i, j), chess.Piece(5, chess.WHITE))
-    return tableroAjedrez.fen()
-
-def guardarTablero(dibujo, nombre):
-    tablero = chess.Board(dibujo)
-    tablerosvg = chess.svg.board(board=tablero)
-    archivo = open(nombre, "w")
-    archivo.write(tablerosvg)
-    archivo.close()
-    print("guardado...")
+        x.append(puntos[i][0])
+        y.append(puntos[i][1])
     
-def guardar(tablero, nombre,  n):
-    dibujo = dibujarTablero(tablero, n)
-    guardarTablero(dibujo, nombre)
-
-                
-n = 8
-p = 1
-H = 1
-tablero = crearTablero(n)
+    plt.hist(y, color='blue', alpha=0.7, label='Histograma')
+    plt.xlabel('Heuristica')
+    plt.title('Histograma')
+    plt.legend()
+    plt.show()
+          
+dimensionTablero = 8
+probabilidad = 0.5
+Heuristica = 2
+max = 100000
+tablero = crearTablero(dimensionTablero)
 verTablero(tablero)
-guardar(tablero, 'original.svg', n)
+guardar(tablero, 'original.svg', dimensionTablero)
 
-solucion = hillClimbing(tablero, n, H, p)
+solucion, puntos = hillClimbing(tablero, dimensionTablero, Heuristica, probabilidad, max)
 verTablero(solucion)
-guardar(solucion, 'solucion.svg', n)
+graficar(puntos)
+guardar(solucion, 'solucion.svg', dimensionTablero)
 
 print('terminado')
